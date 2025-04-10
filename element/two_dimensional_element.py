@@ -1,10 +1,11 @@
 import numpy as np
-from geometry.two_dimensional import Line
+from geometry.two_dimensional import Point
 
 
 class TrussElement2D:
     # Geometric properties
-    element: Line
+    node_0: Point
+    node_1: Point
     length_SI: float
 
     # Direction Cosines
@@ -20,23 +21,24 @@ class TrussElement2D:
 
     def __init__(
         self,
-        node_1: tuple,
-        node_2: tuple,
+        node_0: list,
+        node_1: list,
         young_modulus_SI: float,
         cross_section_area_SI: float,
     ):
-        self.element = Line(node_1, node_2)
+        self.node_0 = Point(node_0)
+        self.node_1 = Point(node_1)
         self.young_modulus_SI = young_modulus_SI
         self.cross_section_area_SI = cross_section_area_SI
         x0, y0 = (
-            self.element.start_point.coordinate[0],
-            self.element.start_point.coordinate[1],
+            self.node_0.coordinate[0],
+            self.node_0.coordinate[1],
         )
         x1, y1 = (
-            self.element.end_point.coordinate[0],
-            self.element.end_point.coordinate[1],
+            self.node_1.coordinate[0],
+            self.node_1.coordinate[1],
         )
-        self.length_SI = np.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+        self.length_SI = float(np.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2))
 
         c = self.c = (x1 - x0) / self.length_SI
         s = self.s = (y1 - y0) / self.length_SI
@@ -55,10 +57,11 @@ class TrussElement2D:
         )
 
     def element_info(self):
-        print("Node 1 (m): ", self.element.start_point.coordinate)
-        print("Node 2 (m): ", self.element.end_point.coordinate)
-        print("Element length (m): ", self.length_SI)
-        print("Direction cosines c and s: ", self.c, self.s)
-        print("Young's Modulus (N/m^2): ", self.young_modulus_SI)
-        print("Cross-sectional Area (m^2): ", self.cross_section_area_SI)
-        print("Local stiffness matrix: ", self.local_stiffness_matrix)
+        print(f"{self.__class__}\n".center(100))
+        print(f"Node 0 (m): {self.node_0.coordinate}\n")
+        print(f"Node 1 (m): {self.node_1.coordinate}\n")
+        print(f"Element length (m): {self.length_SI}\n")
+        print(f"Direction cosines c and s: {[self.c, self.s]}\n")
+        print(f"Young's Modulus (N/m^2): {self.young_modulus_SI}\n")
+        print(f"Cross-sectional Area (m^2): {self.cross_section_area_SI}\n")
+        print(f"Local stiffness matrix:\n {self.local_stiffness_matrix}\n")

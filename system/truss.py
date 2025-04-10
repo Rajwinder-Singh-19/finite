@@ -5,6 +5,7 @@ import numpy as np
 class Truss2D:
     node_list: list
     node_connectivity_map: list
+    element_list: list
     global_stiffness_matrix: np.ndarray
 
     def __init__(self, node_list: list, node_connectivity_map: list):
@@ -12,7 +13,7 @@ class Truss2D:
 
         Args:
             node_list (list): List of all the nodes in truss
-            node_connectivity_map (list): List of all the connectivity data between any pair of nodes in the node list
+            node_connectivity_map (list): List of all the connectivity mappings between any pair of nodes in the node list
 
         Raises:
             ValueError: Atleast 2 nodes are required
@@ -21,22 +22,25 @@ class Truss2D:
             ValueError: Node connectivity contains an invalid node index
             ValueError: Young's modulus for an element is a strictly positive quantity
             ValueError: Cross-sectional area for element is a strictly positive quantity
-            RuntimeError: Stiffness matrix is not symmetric
+            RuntimeError: Global Stiffness matrix is not symmetric
         """
         if len(node_list) < 2:
             raise ValueError("Atleast 2 nodes are required")
         for node in node_list:
             if len(node) != 2:
                 raise ValueError(
-                    f"Nodes must contain both x and y co-ordinate. The node list contains {node} which does not meet this requirement"
+                    f"Nodes must contain only x and y co-ordinate. The node list contains {node} which does not meet this requirement"
                 )
 
         self.node_list = node_list
+        
         for connectivity in node_connectivity_map:
             if len(connectivity) != 4:
                 raise ValueError(
-                    "Node connectivity must contain 4 values of in this format -> [{node 1 of the connecting element}, {node 2 of the connecting element}, {young's modulus of the connecting element}, {cross-sectional area of the connecting element}]"
-                )
+                    "Node connectivity must contain 4 values of in this format -> [{node 1 of the connecting element}, {node 2 of the connecting element}, {young's modulus of the connecting element}, {cross-sectional area of the connecting element}]")
+        
+        self.element_list = []
+        
         for idx, (node_i, node_j, young_modulus_SI, cross_section_area_SI) in enumerate(
             node_connectivity_map
         ):
@@ -56,12 +60,18 @@ class Truss2D:
                 raise ValueError(
                     f"Cross-sectional area for element {idx+1} is non-positive. It is a strictly positive quantity."
                 )
+            
+            element = TrussElement2D(node_list[node_i], node_list[node_j], young_modulus_SI, cross_section_area_SI)
+            self.element_list.append(element)
+            
         self.node_connectivity_map = node_connectivity_map
+        
         self.assemble_global_stiffness()
+        
         if not np.allclose(
             self.global_stiffness_matrix, self.global_stiffness_matrix.T
         ):
-            raise RuntimeError("Stiffness matrix is not symmetric")
+            raise RuntimeError("Global Stiffness matrix is not symmetric")
 
     def assemble_global_stiffness(self):
         n_nodes = len(self.node_list)
@@ -87,3 +97,12 @@ class Truss2D:
             K[rows, cols] += k
 
         self.global_stiffness_matrix = K
+    
+    def truss_info(self):
+        print(f"{self.__class__}\n".center(100))
+        for idx, element in enumerate(self.element_list):
+            print(f"ELEMENT {idx}\n".center(100))
+            element.element_info()
+            print("")
+        print(f"Global Stiffness Matrix: \n")
+        print(self.global_stiffness_matrix)
