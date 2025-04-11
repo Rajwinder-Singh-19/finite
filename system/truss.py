@@ -7,6 +7,8 @@ class Truss2D:
     node_connectivity_map: list
     element_list: list
     global_stiffness_matrix: np.ndarray
+    global_force_vector: np.ndarray
+    global_displacement_vector: np.ndarray
 
     def __init__(self, node_list: list, node_connectivity_map: list):
         """Constructor for a 2D truss system consisting of multiple nodes connected using a 2D truss element.
@@ -33,14 +35,15 @@ class Truss2D:
                 )
 
         self.node_list = node_list
-        
+
         for connectivity in node_connectivity_map:
             if len(connectivity) != 4:
                 raise ValueError(
-                    "Node connectivity must contain 4 values of in this format -> [{node 1 of the connecting element}, {node 2 of the connecting element}, {young's modulus of the connecting element}, {cross-sectional area of the connecting element}]")
-        
+                    "Node connectivity must contain 4 values of in this format -> [{node 1 of the connecting element}, {node 2 of the connecting element}, {young's modulus of the connecting element}, {cross-sectional area of the connecting element}]"
+                )
+
         self.element_list = []
-        
+
         for idx, (node_i, node_j, young_modulus_SI, cross_section_area_SI) in enumerate(
             node_connectivity_map
         ):
@@ -60,18 +63,27 @@ class Truss2D:
                 raise ValueError(
                     f"Cross-sectional area for element {idx+1} is non-positive. It is a strictly positive quantity."
                 )
-            
-            element = TrussElement2D(node_list[node_i], node_list[node_j], young_modulus_SI, cross_section_area_SI)
+
+            element = TrussElement2D(
+                node_list[node_i],
+                node_list[node_j],
+                young_modulus_SI,
+                cross_section_area_SI,
+            )
             self.element_list.append(element)
-            
+
         self.node_connectivity_map = node_connectivity_map
-        
+
         self.assemble_global_stiffness()
-        
+
         if not np.allclose(
             self.global_stiffness_matrix, self.global_stiffness_matrix.T
         ):
             raise RuntimeError("Global Stiffness matrix is not symmetric")
+
+        self.global_force_vector = np.zeros(2 * len(self.node_list))
+
+        self.global_displacement_vector = np.zeros(2 * len(self.node_list))
 
     def assemble_global_stiffness(self):
         n_nodes = len(self.node_list)
@@ -97,7 +109,39 @@ class Truss2D:
             K[rows, cols] += k
 
         self.global_stiffness_matrix = K
-    
+
+    def constrain(self, nodes: list = [], global_dofs: list = []):
+        for node in nodes:
+            for dof in [2 * node, 2 * node + 1]:
+                self._constrain_dof(dof)
+
+        for dof in global_dofs:
+            self._constrain_dof(dof)
+
+    def _constrain_dof(self, dof: int):
+        self.global_stiffness_matrix[dof, :] = 0
+        self.global_stiffness_matrix[:, dof] = 0
+        self.global_stiffness_matrix[dof, dof] = 1
+        self.global_force_vector[dof] = 0
+
+    def apply_load(self, applied_node_list: list, applied_force_list: list):
+        if len(applied_node_list) != len(applied_force_list):
+            raise ValueError(
+                "All the specified nodes in the applied_node_list argument must have forces in the form [fx, fy] applied to them"
+            )
+
+        for node, (fx, fy) in zip(applied_node_list, applied_force_list):
+            self.global_force_vector[2 * node] += fx
+            self.global_force_vector[2 * node + 1] += fy
+
+    def solve(self):
+        self.global_displacement_vector = np.linalg.solve(
+            self.global_stiffness_matrix, self.global_force_vector
+        )
+
+    def print_nodal_displacements(self):
+        print(self.global_displacement_vector.reshape((-1, 2)))
+
     def truss_info(self):
         print(f"{self.__class__}\n".center(100))
         for idx, element in enumerate(self.element_list):
@@ -106,3 +150,9 @@ class Truss2D:
             print("")
         print(f"Global Stiffness Matrix: \n")
         print(self.global_stiffness_matrix)
+        print("")
+        print(f"Global Force Vector: \n")
+        print(self.global_force_vector.reshape((-1, 2)))
+        print("")
+        print(f"Global Displacement Vector: \n")
+        self.print_nodal_displacements()

@@ -1,11 +1,11 @@
 import numpy as np
-from geometry.two_dimensional import Point
+from geometry.two_dimensional import Node
 
 
 class TrussElement2D:
     # Geometric properties
-    node_0: Point
-    node_1: Point
+    node_0: Node
+    node_1: Node
     length_SI: float
 
     # Direction Cosines
@@ -26,8 +26,8 @@ class TrussElement2D:
         young_modulus_SI: float,
         cross_section_area_SI: float,
     ):
-        self.node_0 = Point(node_0)
-        self.node_1 = Point(node_1)
+        self.node_0 = Node(node_0)
+        self.node_1 = Node(node_1)
         self.young_modulus_SI = young_modulus_SI
         self.cross_section_area_SI = cross_section_area_SI
         x0, y0 = (
