@@ -110,13 +110,33 @@ class Truss2D:
 
         self.global_stiffness_matrix = K
 
-    def constrain(self, nodes: list = [], global_dofs: list = []):
-        for node in nodes:
-            for dof in [2 * node, 2 * node + 1]:
-                self._constrain_dof(dof)
+    def constrain(self, nodes: list, constrained_direction: list):
+        """Constrains the displacement of a node in the specified direction.
 
-        for dof in global_dofs:
-            self._constrain_dof(dof)
+        Args:
+            nodes (list): list of all the nodes to be constrained
+            constrained_direction (list): The list of constrained direction for each listed node. 0 -> Constrains displacement in x direction. 1 -> Constrains displacement in y direction. 2 -> Constrains displacement in both x and y directions.
+
+        Raises:
+            ValueError: Constraints must be specified for all the listed nodes
+            ValueError: Invalid direction to constrain.
+        """
+        if len(constrained_direction) != len(nodes):
+            raise ValueError("Constraints must be specified for all the listed nodes")
+
+        if max(constrained_direction) > 2 or min(constrained_direction) < 0:
+            raise ValueError(
+                "Invalid direction to constrain. Constrained dof list can only include the values of 0 (to constrain only x direction), 1 (to constrain only y direction), 2 (to constrain both x and y directions)"
+            )
+
+        for node, dof in zip(nodes, constrained_direction):
+            if dof == 0:
+                self._constrain_dof(2 * node)
+            elif dof == 1:
+                self._constrain_dof(2 * node + 1)
+            elif dof == 2:
+                self._constrain_dof(2 * node)
+                self._constrain_dof(2 * node + 1)
 
     def _constrain_dof(self, dof: int):
         self.global_stiffness_matrix[dof, :] = 0
@@ -138,8 +158,32 @@ class Truss2D:
         self.global_displacement_vector = np.linalg.solve(
             self.global_stiffness_matrix, self.global_force_vector
         )
+        is_true_sol: bool = np.allclose(
+            np.dot(self.global_stiffness_matrix, self.global_displacement_vector),
+            self.global_force_vector,
+        )
 
-    def print_nodal_displacements(self):
+        if not is_true_sol:
+            raise RuntimeError(
+                "The solution calculated from system of linear equations is not correct"
+            )
+
+        nodal_displacements = self.global_displacement_vector.reshape((-1, 2))
+
+        for element, (node_i, node_j, _, _) in zip(
+            self.element_list, self.node_connectivity_map
+        ):
+            # Get displacements for this element's nodes
+            disp_i = nodal_displacements[node_i]  # [ux_i, uy_i]
+            disp_j = nodal_displacements[node_j]  # [ux_j, uy_j]
+
+            # Assign to element nodes (assuming your element has these attributes)
+            element.node_0.x_displacement = disp_i[0]
+            element.node_0.y_displacement = disp_i[1]
+            element.node_1.x_displacement = disp_j[0]
+            element.node_1.y_displacement = disp_j[1]
+
+    def _print_nodal_displacements(self):
         print(self.global_displacement_vector.reshape((-1, 2)))
 
     def truss_info(self):
@@ -155,4 +199,4 @@ class Truss2D:
         print(self.global_force_vector.reshape((-1, 2)))
         print("")
         print(f"Global Displacement Vector: \n")
-        self.print_nodal_displacements()
+        self._print_nodal_displacements()
