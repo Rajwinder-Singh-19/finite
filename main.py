@@ -24,6 +24,7 @@ def main():
 
     truss.apply_load([2], [[100, 100]])  
     truss.solve()
+    truss.truss_info()
 
 
 if __name__ == "__main__":
